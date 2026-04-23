@@ -1,6 +1,11 @@
 # 🚀 Application Log Monitor & Alert Dashboard
 
-A production-style **log monitoring system** that ingests synthetic web application logs, stores them in PostgreSQL, performs SQL-based analytics, triggers threshold-based alerts using Python, and visualizes system health via Grafana dashboards.
+![Python](https://img.shields.io/badge/Python-3.13-blue)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)
+![Grafana](https://img.shields.io/badge/Grafana-Dashboard-orange)
+![Docker](https://img.shields.io/badge/Docker-Containerized-blue)
+
+A production-style **log monitoring and observability system** that simulates application logs, processes them through an ETL pipeline, stores them in PostgreSQL, performs SQL-based analytics, triggers threshold-based alerts, and visualizes system health via Grafana dashboards.
 
 ---
 
@@ -21,13 +26,13 @@ A production-style **log monitoring system** that ingests synthetic web applicat
 
 ```bash
 log_monitor/
-├── log_generator.py       # Generates 10,000+ synthetic log records → CSV
-├── db_setup.py            # Creates PostgreSQL schema & loads CSV data
-├── queries.sql            # SQL queries for log analysis
-├── alerting.py            # Threshold-based alert engine
-├── grafana_dashboard.json # Grafana dashboard (import via UI)
-├── docker-compose.yml     # PostgreSQL + Grafana setup
-└── grafana_provisioning/  # Datasource configuration
+├── log_generator.py       # Generates 10K+ synthetic logs
+├── db_setup.py            # Loads logs into PostgreSQL
+├── queries.sql            # SQL analytics queries
+├── alerting.py            # Alert engine (threshold-based)
+├── grafana_dashboard.json # Dashboard config
+├── docker-compose.yml     # Services setup
+└── grafana_provisioning/  # Datasource config
 ```
 
 ---
@@ -41,7 +46,8 @@ docker compose up -d
 ```
 
 * PostgreSQL → `localhost:5432`
-* Grafana → `http://localhost:3000` (admin/admin)
+* Grafana → http://localhost:3000
+  Login: `admin / admin`
 
 ---
 
@@ -60,8 +66,8 @@ python log_generator.py
 ```
 
 * Generates `app_logs.csv`
-* ~10,500 records over 30 days
-* Includes simulated error spike (days 10–12)
+* ~10,500 records across 30 days
+* Includes simulated **error spikes**
 
 ---
 
@@ -71,41 +77,31 @@ python log_generator.py
 python db_setup.py
 ```
 
-* Creates `app_logs` table
-* Adds indexes
-* Loads CSV into PostgreSQL
+* Creates schema + indexes
+* Loads data into PostgreSQL
 
 ---
 
-### 5️⃣ Run SQL Queries
+### 5️⃣ Run Alert Engine
 
 ```bash
-psql -U postgres -d log_monitor -f queries.sql
+python alerting.py
 ```
 
----
-
-### 6️⃣ Run Alert Engine
+or continuous mode:
 
 ```bash
-# Run once
-python alerting.py
-
-# Continuous monitoring
 python alerting.py --watch 60
 ```
 
-* Alerts printed in console
-* Saved to `alerts.log`
-
 ---
 
-### 7️⃣ Setup Grafana Dashboard
+### 6️⃣ Setup Grafana Dashboard
 
-* Open: `http://localhost:3000`
-* Login: `admin / admin`
+* Open → http://localhost:3000
+* Go to → **Connections → Data Sources**
 
-#### Add Data Source:
+#### Add PostgreSQL:
 
 * Host → `postgres:5432`
 * Database → `log_monitor`
@@ -120,65 +116,71 @@ python alerting.py --watch 60
 
 ---
 
-## 📊 SQL Queries Overview
+## 📊 Dashboard Metrics
 
-| # | Query                   | Technique Used       |
-| - | ----------------------- | -------------------- |
-| 1 | Overall error rate      | Aggregate + CASE     |
-| 2 | Error rate per endpoint | GROUP BY + HAVING    |
-| 3 | P95 / P99 response time | `PERCENTILE_CONT`    |
-| 4 | Hourly spike detection  | CTE + STDDEV         |
-| 5 | Top failing endpoints   | Filtered aggregation |
-| 6 | Daily traffic trends    | `DATE_TRUNC`         |
-| 7 | Slowest requests        | `ROW_NUMBER()`       |
-| 8 | Error type breakdown    | Window functions     |
-
----
-
-## 🚨 Alert Rules
-
-| Rule                | Threshold        | Severity    |
-| ------------------- | ---------------- | ----------- |
-| High Error Rate     | > 5% (last hour) | 🚨 CRITICAL |
-| Slow Response (P95) | > 1000 ms        | ⚠️ WARNING  |
-| Server Error Spike  | > 10 (15 min)    | 🚨 CRITICAL |
-
----
-
-## 🧠 Key Design Decisions
-
-* 📌 **Synthetic Error Spike**
-  Simulated failures to test anomaly detection logic
-
-* 📌 **P95/P99 over Average**
-  Industry-standard SLO metrics (better than mean)
-
-* 📌 **Polling-based Alert Engine**
-  Mirrors real tools like Splunk scheduled alerts
-
-* 📌 **Indexed Columns**
-  `timestamp`, `status_code`, `endpoint` for performance
+* 📈 Total Requests
+* ⚠️ Error Rate (%)
+* ⚡ Avg Response Time
+* 🚨 Server Errors (5xx)
+* 📊 Endpoint Performance
+* 📉 Error Trends
 
 ---
 
 ## 📸 Screenshots
 
-> Add Grafana dashboard screenshots here
+<p align="center">
+  <img src="screenshots/dashboard.png" width="900"/>
+</p>
+
+---
+
+## 📊 SQL Queries Overview
+
+| # | Query                 | Technique            |
+| - | --------------------- | -------------------- |
+| 1 | Error rate            | CASE + Aggregate     |
+| 2 | Endpoint errors       | GROUP BY             |
+| 3 | P95/P99 latency       | `PERCENTILE_CONT`    |
+| 4 | Spike detection       | CTE + STDDEV         |
+| 5 | Top failing endpoints | Filtered aggregation |
+| 6 | Daily trends          | `DATE_TRUNC`         |
+| 7 | Slow requests         | Window functions     |
+| 8 | Error breakdown       | Percentage share     |
+
+---
+
+## 🚨 Alert Rules
+
+| Rule               | Threshold | Severity    |
+| ------------------ | --------- | ----------- |
+| High Error Rate    | > 5%      | 🚨 CRITICAL |
+| High Latency (P95) | > 1000 ms | ⚠️ WARNING  |
+| Server Error Spike | > 10      | 🚨 CRITICAL |
+
+---
+
+## 🧠 Key Design Decisions
+
+* **Synthetic error spike** → Enables realistic anomaly detection
+* **P95/P99 metrics** → Industry-standard (better than average)
+* **Polling alert engine** → Similar to Splunk alerts
+* **Indexed columns** → Optimized for performance
 
 ---
 
 ## 💡 Use Cases
 
-* Application performance monitoring
-* Backend observability systems
-* Error tracking & debugging
-* DevOps monitoring pipelines
+* Application monitoring
+* Backend observability
+* Error tracking systems
+* DevOps dashboards
 
 ---
 
 ## 🚀 Future Improvements
 
-* Kafka-based real-time streaming
+* Kafka streaming pipeline
 * Prometheus integration
 * Email/SMS alerts
 * Cloud deployment
@@ -193,4 +195,4 @@ python alerting.py --watch 60
 
 ## ⭐ Support
 
-If you found this useful, consider giving a ⭐ on GitHub!
+If you found this useful, give it a ⭐ on GitHub!
