@@ -1,0 +1,173 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_POSTGRESQL",
+      "label": "PostgreSQL",
+      "description": "Connect to your local log_monitor database",
+      "type": "datasource",
+      "pluginId": "postgres",
+      "pluginName": "PostgreSQL"
+    }
+  ],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "9.0.0" },
+    { "type": "datasource", "id": "postgres", "name": "PostgreSQL", "version": "1.0.0" },
+    { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
+    { "type": "panel", "id": "stat", "name": "Stat", "version": "" },
+    { "type": "panel", "id": "table", "name": "Table", "version": "" },
+    { "type": "panel", "id": "bargauge", "name": "Bar gauge", "version": "" }
+  ],
+  "title": "Application Log Monitor",
+  "uid": "log-monitor-dashboard",
+  "version": 1,
+  "schemaVersion": 36,
+  "refresh": "30s",
+  "time": { "from": "now-30d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Overall Error Rate (%)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
+        "rawSql": "SELECT ROUND(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS error_rate FROM app_logs WHERE $__timeFilter(timestamp)",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "Total Requests",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
+        "rawSql": "SELECT COUNT(*) AS total_requests FROM app_logs WHERE $__timeFilter(timestamp)",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Avg Response Time (ms)",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
+        "rawSql": "SELECT ROUND(AVG(response_time_ms), 0) AS avg_response_ms FROM app_logs WHERE $__timeFilter(timestamp)",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "Server Errors (5xx)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
+        "rawSql": "SELECT COUNT(*) AS server_errors FROM app_logs WHERE status_code >= 500 AND $__timeFilter(timestamp)",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "Hourly Error Rate Over Time",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 16, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "color": { "mode": "palette-classic" } }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
+        "rawSql": "SELECT DATE_TRUNC('hour', timestamp) AS time, ROUND(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS error_rate_pct FROM app_logs WHERE $__timeFilter(timestamp) GROUP BY 1 ORDER BY 1",
+        "format": "time_series"
+      }]
+    },
+    {
+      "id": 6,
+      "title": "Avg Response Time per Endpoint",
+      "type": "bargauge",
+      "gridPos": { "x": 0, "y": 12, "w": 8, "h": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 400 },
+              { "color": "red", "value": 800 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
+        "rawSql": "SELECT endpoint, ROUND(AVG(response_time_ms), 0) AS avg_ms FROM app_logs WHERE $__timeFilter(timestamp) GROUP BY endpoint ORDER BY avg_ms DESC",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 7,
+      "title": "Top Errors by Type",
+      "type": "table",
+      "gridPos": { "x": 8, "y": 12, "w": 8, "h": 8 },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
+        "rawSql": "SELECT error_type, status_code, COUNT(*) AS occurrences, ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS pct FROM app_logs WHERE status_code >= 400 AND $__timeFilter(timestamp) GROUP BY error_type, status_code ORDER BY occurrences DESC",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 8,
+      "title": "Daily Traffic & Errors",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{
+        "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
+        "rawSql": "SELECT DATE(timestamp) AS time, COUNT(*) AS total_requests, SUM(CASE WHEN status_code >= 500 THEN 1 ELSE 0 END) AS server_errors, SUM(CASE WHEN status_code BETWEEN 400 AND 499 THEN 1 ELSE 0 END) AS client_errors FROM app_logs WHERE $__timeFilter(timestamp) GROUP BY DATE(timestamp) ORDER BY 1",
+        "format": "time_series"
+      }]
+    }
+  ]
+}
